@@ -11,29 +11,20 @@ class Videofeed:
         self.vs = None
 
     def start(self):
-        self.vs = VideoStream(self.index).start()
+        self.vs = VideoStream(self.index)
+        self.vs.start()
         time.sleep(1.0)
 
-    def clean(self):
+    def stop(self):
         self.vs.stop()
         cv2.destroyAllWindows()
 
-    def check_camera_index(self):
-        key = cv2.waitKey(1)
-        if key == ord("n"): 
-            self.index += 1 
-            self.vs = VideoStream(self.index).start()
-            if not self.vs: 
-                self.index = 0
-                self.vs = VideoStream(self.index).start()
-    
     def get_frame(self):
-        self.frame = imutils.resize(self.vs.read(), width=450)
-        self.check_camera_index()
+        self.frame = imutils.resize(self.vs.read(), width= 450)
+        cv2.waitKey(1) & 0xFF
         b = io.BytesIO()
         Image.fromarray(cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)).save(b, 'jpeg')
         return b.getvalue()
-
 
     def set_frame(self, stream):
         self.frame = Image.open(io.BytesIO(stream))

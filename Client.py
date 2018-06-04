@@ -1,4 +1,4 @@
-import socket, playsound, argparse
+import socket, playsound, argparse, signal
 from threading import Thread
 from Videofeed import Videofeed
 
@@ -11,38 +11,68 @@ class Client:
         self.vf.start()
         self.path = path
         self.ALARM_ON = False
+        self.EXIT = False
         print "[INFO] Client connected to server[", TCP_IP, "] on port: ", TCP_PORT
 
     def str2bool(self, v):
         return v.lower() in ("yes", "true", "t", "1")
 
+    def clean(self, e):
+        try:
+            self.EXIT = True
+            self.ALARM_ON = False
+            self.vf.stop()
+            self.client_socket.shutdown(2)
+            self.client_socket.close()
+            print e
+        except socket.error, e:
+            print e
+
+    def sound_alarm(self, path):
+        while self.ALARM_ON:
+            playsound.playsound(path)
+
     def send_frame(self):
-        while True:
-            data = self.vf.get_frame() 
-            self.client_socket.send(data)
+        while not self.EXIT:
+            try:
+                data = self.vf.get_frame() 
+                self.client_socket.send(data)
+            except socket.error, e:
+                self.clean(e)
+                break
+            except Exception, e:
+                self.clean(e)
+                break
 
     def update_alarm(self):
-        while True:
-            self.ALARM_ON = self.str2bool( self.client_socket.recv(64))
-            self.sound_alarm(self.path)
+        while not self.EXIT:
+            try:
+                self.ALARM_ON = self.str2bool( self.client_socket.recv(64) )
+                t = Thread( target = self.sound_alarm, args = (self.path,) )
+                t.deamon = True
+                t.start()
+            except socket.error, e:
+                self.clean(e)
+                break
+            except Exception, e:
+                self.clean(e)
+                break
 
     def connect(self):
+        t1 = Thread(target=self.send_frame)
+        t2 = Thread(target=self.update_alarm)
+        t1.deamon = True
+        t2.deamon = True
+        t1.start()
+        t2.start()
+
         try:
-            t1 = Thread(target=self.send_frame)
-            t2 = Thread(target=self.update_alarm)
-            t1.deamon = True
-            t2.deamon = True
-            t1.start()
-            t2.start()
-        except Exception, e:
-            print e
-            self.client_socket.close() 
-    
-    def sound_alarm(self, path):
-    	playsound.playsound(path)
+            signal.pause()
+        except KeyboardInterrupt, e:
+            print "\nKeyboardInterrupt"
+            self.clean(e)
 
 if __name__ == "__main__":
-    
     ap = argparse.ArgumentParser()
     ap.add_argument("-a", "--alarm", type=str, default="alarm.wav",
         help="path alarm .WAV file")
@@ -50,4 +80,3 @@ if __name__ == "__main__":
 
     client = Client(path = args["alarm"])
     client.connect()
-	

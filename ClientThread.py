@@ -42,16 +42,24 @@ class ClientThread(threading.Thread):
             threadLimiter.acquire()
             while self.client_socket:
                 try:
+                    print "1"
                     data = self.receive_data()
+                    print "2"
                     self.frame = self.vf.convert_to_frame(data)
+                    print "3"
                     self.ALARM_ON = self.detector.detect_drowsiness(self.frame)
+                    print "4"
                     self.send_alarm_status(self.ALARM_ON)
+                    print "5\n"
                 except StopAssignments:
                     destroyAllWindows()
                     break                
                 except socket.error, e:
                     destroyAllWindows() 
-                    print "\n[CLIENT THREAD ERROR] ", e
+                    print e
+                    break
+                except Exception,e:
+                    print e
                     break
 
             self.client_socket.close()
