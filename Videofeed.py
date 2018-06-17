@@ -1,41 +1,32 @@
-import argparse, imutils, time, cv2, sys, numpy, io 
-from imutils.video import VideoStream
-from PIL import Image
+import argparse, time, cv2, glob
 
 class Videofeed:
     
-    def __init__(self, name = "test", index = 0):
-        self.index = index
+    def __init__(self, name = "test"):
         self.name = name
         self.frame = None
-        self.vs = None
 
     def start(self):
-        self.vs = VideoStream(self.index)
-        self.vs.start()
+        for index in glob.glob("/dev/video?"):
+            self.vs = cv2.VideoCapture(index)
+
         time.sleep(1.0)
-
-    def stop(self):
-        self.vs.stop()
-        cv2.destroyAllWindows()
-
+    
     def get_frame(self):
-        self.frame = imutils.resize(self.vs.read(), width= 450)
-        cv2.waitKey(1) & 0xFF
-        b = io.BytesIO()
-        Image.fromarray(cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)).save(b, 'jpeg')
-        return b.getvalue()
+        _, frame = self.vs.read()
+        w = 450
+        frame = cv2.resize(frame, (w, int(frame.shape[0] * w / frame.shape[1])), interpolation = cv2.INTER_AREA)
+        #h = 680
+        #frame = cv2.resize(frame, (int(frame.shape[0] * h / frame.shape[1]), h), interpolation = cv2.INTER_AREA)
+        frame = cv2.flip(frame, 2)
+        return frame
 
     def set_frame(self, stream):
-        self.frame = Image.open(io.BytesIO(stream))
-        self.frame = cv2.cvtColor(numpy.array(self.frame), cv2.COLOR_RGB2BGR)
-        cv2.imshow(self.name, self.frame)
-        cv2.waitKey(1)
-
-    def convert_to_frame(self, stream):
-        self.frame = Image.open(io.BytesIO(stream))
-        self.frame = cv2.cvtColor(numpy.array(self.frame), cv2.COLOR_RGB2BGR)
-        return self.frame
+        cv2.imshow(self.name, stream)
+        key = cv2.waitKey(10)
+        if key == 27:
+            cv2.destroyAllWindows()
+            return True
 
 if __name__ == "__main__" :
     ap = argparse.ArgumentParser()
@@ -43,10 +34,10 @@ if __name__ == "__main__" :
     ap.add_argument("-w", "--webcam", type=int, default=0, help="index of webcam on system")
     args = vars(ap.parse_args())
     
-    client = Videofeed("client", 0)
-    server = Videofeed("server", 0)
-    client.start()
+    sender = Videofeed("sender")
+    receiver = Videofeed("receiver")
+    sender.start()
     while True:
-        stream = client.get_frame()
-        server.set_frame(stream)
+        stream = sender.get_frame()
+        receiver.set_frame(stream)
 
