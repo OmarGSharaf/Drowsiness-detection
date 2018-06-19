@@ -1,4 +1,6 @@
-import argparse, time, cv2, glob
+import argparse, imutils, time, cv2, sys, numpy, io, glob
+from imutils.video import VideoStream
+from PIL import Image
 
 class Videofeed:
     
@@ -8,25 +10,37 @@ class Videofeed:
 
     def start(self):
         for index in glob.glob("/dev/video?"):
-            self.vs = cv2.VideoCapture(index)
+            self.vs = VideoStream(index)
+            self.vs.start()
 
         time.sleep(1.0)
-    
+
+    def stop(self):
+        self.vs.stop()
+        cv2.destroyAllWindows()
+
     def get_frame(self):
-        _, frame = self.vs.read()
-        w = 450
-        frame = cv2.resize(frame, (w, int(frame.shape[0] * w / frame.shape[1])), interpolation = cv2.INTER_AREA)
-        #h = 680
-        #frame = cv2.resize(frame, (int(frame.shape[0] * h / frame.shape[1]), h), interpolation = cv2.INTER_AREA)
-        frame = cv2.flip(frame, 2)
-        return frame
+        self.frame = imutils.resize(self.vs.read(), width= 480)
+        b = io.BytesIO()
+        Image.fromarray(cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)).save(b, 'jpeg')
+        return b.getvalue()
 
     def set_frame(self, stream):
-        cv2.imshow(self.name, stream)
+        self.frame = self.convert_to_frame(stream)
+        self.show_frame(self.frame)
+
+    def convert_to_frame(self, stream):
+        self.frame = Image.open(io.BytesIO(stream))
+        self.frame = cv2.cvtColor(numpy.array(self.frame), cv2.COLOR_RGB2BGR)
+        self.frame = cv2.flip(self.frame, 2)
+        return self.frame
+
+    def show_frame(self, frame):
+        cv2.imshow(self.name, frame)
         key = cv2.waitKey(10)
         if key == 27:
             cv2.destroyAllWindows()
-            return True
+            return True   
 
 if __name__ == "__main__" :
     ap = argparse.ArgumentParser()
@@ -34,10 +48,10 @@ if __name__ == "__main__" :
     ap.add_argument("-w", "--webcam", type=int, default=0, help="index of webcam on system")
     args = vars(ap.parse_args())
     
-    sender = Videofeed("sender")
-    receiver = Videofeed("receiver")
-    sender.start()
+    client = Videofeed("client")
+    server = Videofeed("server")
+    client.start()
     while True:
-        stream = sender.get_frame()
-        receiver.set_frame(stream)
+        stream = client.get_frame()
+        server.set_frame(stream)
 
