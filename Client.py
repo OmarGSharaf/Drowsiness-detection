@@ -8,7 +8,9 @@ class Client:
     def __init__(self, path, TCP_IP = "127.0.0.1", TCP_PORT = 8080, BUFFER_SIZE = 32768):
         self.BUFFER_SIZE = BUFFER_SIZE
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.settimeout(10)
         self.client_socket.connect((str(TCP_IP), TCP_PORT))
+        self.client_socket.settimeout(None)
         print ("[INFO] Client connected to server [", TCP_IP, "] on port: ", TCP_PORT)
         self.vf = Videofeed("client")
         self.vf.start()

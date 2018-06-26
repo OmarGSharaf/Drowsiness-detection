@@ -4,8 +4,6 @@ from Videofeed import Videofeed
 from Detector import Detector
 from OpSystemDetector import detectOpSystem
 
-class StopAssignments(Exception): pass
-
 class Server:
     def __init__(self, TCP_IP = "127.0.0.1", TCP_PORT = 8080, BUFFER_SIZE = 32768):
         self.BUFFER_SIZE = BUFFER_SIZE
@@ -20,7 +18,7 @@ class Server:
         print ("\n[INFO] Server IP: %s" %(TCP_IP))
         print ("[INFO] Server is listening on port: %s" %(TCP_PORT))
 
-    def send_alarm_status(self, ALARM_ON):
+    def send_alarm_status(self):
         if self.PREV_ALARM_ON != self.ALARM_ON:
             self.PREV_ALARM_ON = self.ALARM_ON
             self.client_socket.send( str(self.ALARM_ON).encode('utf-8') )
@@ -31,9 +29,6 @@ class Server:
             part = self.client_socket.recv(self.BUFFER_SIZE)
             data += part
             if len(part) < self.BUFFER_SIZE: break
-        if sys.getsizeof(data)<40:
-            print ("[INFO] Client stopped sending messages")
-            raise StopAssignments
         return data
 
     def start(self):
@@ -48,12 +43,14 @@ class Server:
             try:
                 data = self.receive_data()
                 frame = self.vf.convert_to_frame(data)
+                        
+                if sys.getsizeof(data)<40: print ("[INFO] Client stopped sending messages"); break
+
                 self.ALARM_ON = self.detector.detect_drowsiness(frame)
-                self.send_alarm_status(self.ALARM_ON)
-                if self.vf.show_frame(frame):
-                    break
-            except StopAssignments:
-                break      
+                self.send_alarm_status()
+                
+                if self.vf.show_frame(frame): break   
+            
             except Exception as e:
                 print("[EXCEPTION] ", e)
                 break
