@@ -4,6 +4,7 @@ from FaceDetector import FaceDetector
 from EyeDetector import EyeDetector
 from MarkDetector import MarkDetector
 from PoseEstimator import PoseEstimator
+from stabilizer import Stabilizer
 
 CNN_INPUT_SIZE = 128
 
@@ -13,6 +14,7 @@ class Detector:
         self.EYE_AR_THRESH = EYE_AR_THRESH
         self.ROLL_THRESH = ROLL_THRESH
         self.TIME_THRESH = TIME_THRESH
+        self.ALARM_ON = False
         self.T = None
 
         self.faceDetector = FaceDetector()
@@ -28,8 +30,10 @@ class Detector:
 
         h, w = frame.shape[:2]
         self.poseEstimator = PoseEstimator(img_size=(h, w))
-
-        self.ALARM_ON = False
+        self.pose_stabilizers = [Stabilizer(state_num=2,
+                                            measure_num=1,
+                                            cov_process=0.1,
+                                            cov_measure=0.1) for _ in range(6)]
 
     def get_face(self, detector):
         """Get face from image queue. This function is used for multiprocessing"""
@@ -81,18 +85,27 @@ class Detector:
             self.markDetector.draw(frame, marks, color=(0, 255, 0))
 
             # Try pose estimation with 68 points.
-            pose = self.poseEstimator.solve_pose_by_68_points(marks)
+            unstable_pose = self.poseEstimator.solve_pose_by_68_points(marks)
 
-            # Uncomment following line to draw pose annotaion on frame.
-            self.poseEstimator.draw_annotation_box(frame, pose[0], pose[1], color=(0,255, 0))
- 
+            # Stabilize the pose.
+            pose = []
+            pose_np = np.array(unstable_pose).flatten()
+            for value, ps_stb in zip(pose_np, self.pose_stabilizers):
+                ps_stb.update([value])
+                pose.append(ps_stb.state[0])
+            pose = np.reshape(pose, (-1, 3))
+
+            # Uncomment following line to draw stabile pose annotaion on frame.
+            self.poseEstimator.draw_annotation_box(
+                frame, pose[0], pose[1], color=(0,255, 0))
+
             # Calculate Eye Aspect Ratio 
             ear = self.eyeDetector.get_eye(frame, facebox)
 
             # Calculate Euler Angles
             roll, pitch, yaw = self.poseEstimator.get_Euler_Angles(
-                np.array([pose[0][0], pose[0][1], pose[0][2]]),
-                np.array([pose[1][0], pose[1][1], pose[1][2]]))
+                np.array([[pose[0][0]], [pose[0][1]], [pose[0][2]]]),
+                np.array([[pose[1][0]], [pose[1][1]], [pose[1][2]]]))
 
             if ear < self.EYE_AR_THRESH or abs(roll) > self.ROLL_THRESH:
                 if self.T is None:
