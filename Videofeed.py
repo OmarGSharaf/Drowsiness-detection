@@ -31,7 +31,7 @@ class Videofeed:
 
     def convert_to_frame(self, stream):
         self.frame = Image.open(io.BytesIO(stream))
-        self.frame = cv2.cvtColor(numpy.array(self.frame), cv2.COLOR_RGB2BGR)
+        self.frame = cv2.cvtColor(numpy.array(self.frame, dtype=numpy.uint8), cv2.COLOR_RGB2BGR)
         self.frame = cv2.flip(self.frame, 2)
         return self.frame
 
